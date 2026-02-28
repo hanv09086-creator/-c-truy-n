@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Auto Manga Reader</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: sans-serif;
+            color: white;
+        }
+
+        .input-section {
+            padding: 20px;
+            width: 100%;
+            text-align: center;
+            background: #333;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 2px solid orange;
+        }
+
+        input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #555;
+            background: #000;
+            color: #0f0;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: orange;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .reader-container {
+            max-width: 800px;
+            width: 100%;
+            background: #000;
+            min-height: 100vh;
+            padding-bottom: 50px;
+            margin-top: 10px;
+        }
+
+        .reader-container img {
+            display: block;
+            width: 100%;
+            height: auto;
+            margin-bottom: 2px;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: orange;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            color: black;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="input-section">
+        <input type="text" id="urlInput"
+            placeholder="Dán link chap truyện vào đây (vd: https://thienthanxinh5.online/...)">
+        <button onclick="fetchAndDecrypt()">ĐỌC TRUYỆN</button>
+    </div>
+
+    <div class="reader-container" id="chapter-content">
+        <p style="text-align: center; padding: 50px;">Nhập link và nhấn nút để tải truyện.</p>
+    </div>
+
+    <div class="controls" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">UP</div>
+
+    <script>
+        async function fetchAndDecrypt() {
+            const url = document.getElementById('urlInput').value.trim();
+            const container = document.getElementById('chapter-content');
+
+            if (!url) return alert("Vui lòng nhập link truyện!");
+
+            container.innerHTML = '<p style="text-align: center; padding: 50px;">Đang tải và tự động giải mã dữ liệu...</p>';
+
+            try {
+                // Sử dụng CORS proxy để lấy HTML từ trang khác domain
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                const response = await fetch(proxyUrl);
+                const result = await response.json();
+                const htmlText = result.contents;
+
+                // Dùng Regex để tự động trích xuất biến htmlContent từ mã nguồn
+                const regex = /var htmlContent = "(.*?)";/;
+                const match = htmlText.match(regex);
+
+                if (!match) throw new Error("Không tìm thấy dữ liệu truyện trong link này!");
+
+                // Xử lý unescape chuỗi JSON
+                const rawJsonString = JSON.parse('"' + match[1] + '"');
+                const data = JSON.parse(rawJsonString);
+
+                const passphrase = "QfSv5w6pALt73EpPKX";
+
+                const key = CryptoJS.PBKDF2(passphrase, CryptoJS.enc.Hex.parse(data.salt), {
+                    keySize: 256 / 32,
+                    iterations: 999,
+                    hasher: CryptoJS.algo.SHA512
+                });
+
+                const decrypted = CryptoJS.AES.decrypt(data.ciphertext, key, {
+                    iv: CryptoJS.enc.Hex.parse(data.iv)
+                });
+
+                let decryptedHtml = decrypted.toString(CryptoJS.enc.Utf8);
+
+                if (!decryptedHtml) throw new Error("Giải mã thất bại!");
+
+                const cleanHtml = decryptedHtml
+                    .replace(/QfSv5w/g, '.')
+                    .replace(/6pALt7/g, ':')
+                    .replace(/3EpPKX/g, '/');
+
+                container.innerHTML = cleanHtml;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            } catch (error) {
+                console.error(error);
+                container.innerHTML = `<p style="text-align: center; color: red; padding: 50px;">Lỗi: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+
+</html>
