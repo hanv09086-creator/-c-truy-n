@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,18 +8,93 @@
     <title>Auto Manga Reader - Max Speed</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
-        body { background-color: #1a1a1a; margin: 0; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; color: white; }
-        .input-section { padding: 20px; width: 100%; text-align: center; background: #333; position: sticky; top: 0; z-index: 100; border-bottom: 2px solid orange;}
-        input[type="text"] { width: 70%; padding: 10px; font-size: 16px; border: 1px solid #555; background: #000; color: #0f0; margin-right: 10px;}
-        button { padding: 10px 20px; font-size: 16px; background: orange; border: none; cursor: pointer; font-weight: bold; }
-        
-        #debug-panel { width: 90%; max-width: 800px; background: #000; color: #0f0; border: 1px solid #444; margin-top: 10px; padding: 10px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; text-align: left; }
-        
-        .reader-container { max-width: 800px; width: 100%; background: #000; min-height: 100vh; padding-bottom: 50px; margin-top: 10px;}
-        .reader-container img { display: block; width: 100%; height: auto; margin-bottom: 2px; }
-        .controls { position: fixed; bottom: 20px; right: 20px; background: orange; padding: 15px; border-radius: 50%; cursor: pointer; color: black; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.5); z-index: 999;}
+        body {
+            background-color: #1a1a1a;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: sans-serif;
+            color: white;
+        }
+
+        .input-section {
+            padding: 20px;
+            width: 100%;
+            text-align: center;
+            background: #333;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 2px solid orange;
+        }
+
+        input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #555;
+            background: #000;
+            color: #0f0;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: orange;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #debug-panel {
+            width: 90%;
+            max-width: 800px;
+            background: #000;
+            color: #0f0;
+            border: 1px solid #444;
+            margin-top: 10px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 120px;
+            overflow-y: auto;
+            text-align: left;
+        }
+
+        .reader-container {
+            max-width: 800px;
+            width: 100%;
+            background: #000;
+            min-height: 100vh;
+            padding-bottom: 50px;
+            margin-top: 10px;
+        }
+
+        .reader-container img {
+            display: block;
+            width: 100%;
+            height: auto;
+            margin-bottom: 2px;
+        }
+
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: orange;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            color: black;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
     </style>
 </head>
+
 <body>
 
     <div class="input-section">
@@ -48,9 +124,9 @@
             const url = document.getElementById('urlInput').value.trim();
             const container = document.getElementById('chapter-content');
             const debugPanel = document.getElementById('debug-panel');
-            
+
             debugPanel.innerHTML = '';
-            
+
             if (!url) return logDebug("Chưa nhập link!", true);
 
             container.innerHTML = '<p style="text-align: center; padding: 50px;">Đang xử lý bằng Proxy mới...</p>';
@@ -60,16 +136,16 @@
                 // Dùng Proxy CodeTabs thay cho AllOrigins
                 const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
                 const response = await fetch(proxyUrl);
-                
+
                 if (!response.ok) throw new Error("Lỗi Proxy! (Có thể tường lửa web truyện đã chặn).");
-                
+
                 // CodeTabs trả thẳng về HTML (text) chứ không bọc trong JSON như AllOrigins
                 const htmlText = await response.text();
-                
+
                 logDebug("Lấy mã nguồn thành công. Đang tìm dữ liệu JSON...");
                 const match = htmlText.match(/var htmlContent = "(.*?)";/);
                 if (!match) throw new Error("Không tìm thấy dữ liệu truyện. (Tường lửa có thể đã chặn Proxy đọc trang).");
-                
+
                 logDebug("Đang giải mã AES...");
                 const rawJsonString = JSON.parse('"' + match[1] + '"');
                 const data = JSON.parse(rawJsonString);
@@ -81,24 +157,24 @@
 
                 const decrypted = CryptoJS.AES.decrypt(data.ciphertext, key, { iv: CryptoJS.enc.Hex.parse(data.iv) });
                 let decryptedHtml = decrypted.toString(CryptoJS.enc.Utf8);
-                
+
                 if (!decryptedHtml) throw new Error("Giải mã thất bại.");
 
                 let cleanHtml = decryptedHtml.replace(/QfSv5w/g, '.').replace(/6pALt7/g, ':').replace(/3EpPKX/g, '/');
 
                 logDebug("Đang trích xuất link ảnh...");
-                
+
                 let tempDiv = document.createElement('div');
                 tempDiv.innerHTML = cleanHtml;
                 let imgs = tempDiv.querySelectorAll('img');
-                
+
                 let finalHTML = '';
                 let count = 0;
-                let addedLinks = new Set(); 
+                let addedLinks = new Set();
 
                 imgs.forEach((img) => {
                     let realUrl = img.getAttribute('data-qfsv5w') || img.getAttribute('src');
-                    
+
                     if (realUrl && realUrl.startsWith('http') && !realUrl.includes('data:image')) {
                         if (!addedLinks.has(realUrl)) {
                             addedLinks.add(realUrl);
@@ -111,7 +187,7 @@
                 if (count === 0) throw new Error("Không trích xuất được ảnh nào!");
 
                 logDebug(`Thành công! Đã nhặt được ${count} ảnh gốc.`);
-                
+
                 container.innerHTML = finalHTML;
                 window.scrollTo({ top: document.getElementById('debug-panel').offsetTop + 150, behavior: 'smooth' });
 
@@ -122,4 +198,5 @@
         }
     </script>
 </body>
+
 </html>
